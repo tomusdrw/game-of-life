@@ -12,10 +12,37 @@ struct Game {
   ]
 }
 
-
 enum Mutation {
   On(usize, usize),
   Off(usize, usize)
+}
+
+impl Game {
+  pub fn from_str(rows : Vec<String>) -> Self {
+    let mut game = Game {
+      board: [[false; GAME_SIZE]; GAME_SIZE]
+    };
+
+    let cells_to_activate = rows
+      .iter()
+      .zip(0..GAME_SIZE)
+      .map(|(row, x)| {
+        row
+          .chars()
+          .zip(0..GAME_SIZE)
+          .filter(|&(c, _)| c == 'X')
+          .map(move |(_, y)| {
+            (x, y)
+          })
+      })
+      .flat_map(|x| x);
+
+    for (x, y) in cells_to_activate {
+      game.board[x][y] = true;
+    }
+    
+    game
+  } 
 }
 
 impl Display for Game {
@@ -102,22 +129,17 @@ fn game_of_life(game : &Game) -> Vec<Mutation> {
     .collect()
 }
 
-fn main() {
-  let g = Game {
-    board: [[false; GAME_SIZE]; GAME_SIZE]
-  };
 
-  let initial_game = mutate(
-    g,
-    vec![
-      Mutation::On(1, 1),
-      Mutation::On(2, 1),
-      Mutation::On(1, 2),
-      Mutation::On(2, 2)
-    ]
+fn main() {
+  let mut game = Game::from_str([
+    "..X.",
+    "...X", 
+    ".XXX", 
+  ].iter()
+    .map(|x| x.to_string())
+    .collect()
   );
 
-  let mut game = initial_game;
   loop {
     println!("{}", game);
     let mutations = game_of_life(&game);
