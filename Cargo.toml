@@ -2,3 +2,6 @@
 name = "game_of_life"
 version = "0.1.0"
 authors = ["Tomusdrw <tomusdrw@gmail.com>"]
+
+[dependencies]
+ncurses = "5.80.0"
