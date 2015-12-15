@@ -123,12 +123,15 @@ fn main() {
 
     // run simulation step
     if game_state.is_running {
+      curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
       let mutations = game_of_life(&game_state.game);
       game_state.game.mutate(mutations);
 
       // slow it down
       let sleep_millis = (1.0 / game_state.speed * 500.0) as u64;
       sleep(Duration::from_millis(sleep_millis));
+    } else {
+      curs_set(CURSOR_VISIBILITY::CURSOR_VISIBLE);
     }
 
     sleep(Duration::from_millis(100));
