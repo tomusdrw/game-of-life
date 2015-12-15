@@ -1,7 +1,7 @@
 use std::fmt::{self, Formatter, Display};
 use std::vec::Vec;
 
-const GAME_SIZE : usize = 10;
+pub const GAME_SIZE : usize = 64;
 
 pub struct Game {
   board : [
@@ -12,7 +12,8 @@ pub struct Game {
 
 pub enum Mutation {
   On(usize, usize),
-  Off(usize, usize)
+  Off(usize, usize),
+  Toggle(usize, usize)
 }
 
 impl Game {
@@ -41,6 +42,53 @@ impl Game {
     
     game
   } 
+
+  fn count_neighbours(&self, x : usize, y : usize) -> usize {
+    [
+      (1i8, -1i8),
+      (1, 0),
+      (1, 1),
+      (0, -1),
+      (0, 1),
+      (-1, -1),
+      (-1, 0),
+      (-1, 1),
+    ].iter()
+      .map(|&(mod_x, mod_y)| {
+        let n_x = x as i8 + mod_x;
+        let n_y = y as i8 + mod_y;
+
+        (n_x, n_y)
+      })
+      .filter(|&(n_x, n_y)| {
+        let game_size_u = GAME_SIZE as i8;
+
+        let x_out_of_range = n_x < 0 || n_x >= game_size_u;
+        let y_out_of_range = n_y < 0 || n_y >= game_size_u;
+
+        !x_out_of_range && !y_out_of_range
+      })
+      .filter(|&(n_x, n_y)| {
+        let is_alive = self.board[n_x as usize][n_y as usize];
+        is_alive
+      })
+      .count()
+  }
+
+  fn mutate_single(&mut self, mutation : Mutation) {
+    match mutation {
+      Mutation::On(x, y) => self.board[x][y] = true,
+      Mutation::Off(x, y) => self.board[x][y] = false,
+      Mutation::Toggle(x, y) => self.board[x][y] = !self.board[x][y]
+    };
+  }
+
+  pub fn mutate(&mut self, mutations : Vec<Mutation>) {
+    for mutation in mutations {
+      self.mutate_single(mutation)
+    }
+  }
+
 }
 
 impl Display for Game {
@@ -62,49 +110,6 @@ impl Display for Game {
     }
 }
 
-fn mutate_single(mut game : Game, mutation : &Mutation) -> Game {
-  match *mutation {
-    Mutation::On(x, y) => game.board[x][y]=true,
-    Mutation::Off(x, y) => game.board[x][y]=false
-  }
-  game
-}
-
-pub fn mutate(game : Game, mutations : Vec<Mutation>) -> Game {
-  mutations.iter().fold(game, mutate_single)
-}
-
-fn count_neighbours(game : &Game, x : usize, y : usize) -> usize {
-  [
-    (1i8, -1i8),
-    (1, 0),
-    (1, 1),
-    (0, -1),
-    (0, 1),
-    (-1, -1),
-    (-1, 0),
-    (-1, 1),
-  ].iter()
-    .map(|&(mod_x, mod_y)| {
-      let n_x = x as i8 + mod_x;
-      let n_y = y as i8 + mod_y;
-
-      (n_x, n_y)
-    })
-    .filter(|&(n_x, n_y)| {
-      let game_size_u = GAME_SIZE as i8;
-
-      let x_out_of_range = n_x < 0 || n_x >= game_size_u;
-      let y_out_of_range = n_y < 0 || n_y >= game_size_u;
-
-      !x_out_of_range && !y_out_of_range
-    })
-    .filter(|&(n_x, n_y)| {
-      let is_alive = game.board[n_x as usize][n_y as usize];
-      is_alive
-    })
-    .count()
-}
 
 pub fn game_of_life(game : &Game) -> Vec<Mutation> {
   (0..GAME_SIZE)
@@ -113,7 +118,7 @@ pub fn game_of_life(game : &Game) -> Vec<Mutation> {
     })
     .map(|(x, y)| {
       let current_is_alive = game.board[x][y];
-      let no_of_neighbours = count_neighbours(&game, x, y);
+      let no_of_neighbours = game.count_neighbours(x, y);
 
       if current_is_alive && no_of_neighbours != 2 && no_of_neighbours != 3 {
         Some(Mutation::Off(x, y))
