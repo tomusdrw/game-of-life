@@ -1,11 +1,15 @@
 use std::thread::sleep;
 use std::time::Duration;
+use std::fs::File;
+use std::io::prelude::*;
 
 mod game;
 use game::*;
 
 extern crate ncurses;
 use ncurses::*;
+
+const FILE_NAME : &'static str = "game_of_life.save";
 
 #[derive(PartialEq)]
 enum Direction {
@@ -16,17 +20,29 @@ enum Direction {
 enum Action {
   SpeedUp,
   SpeedDown,
+  ToggleHelp,
   ToggleRunning,
   ToggleFieldActive,
   Cursor(Direction),
+  SaveToFile,
+  LoadFromFile,
   Quit,
   None
+}
+
+struct IoError;
+
+impl From<std::io::Error> for IoError {
+  fn from(err : std::io::Error) -> IoError {
+    IoError
+  }
 }
 
 struct GameState {
   game : Game,
   speed: f64,
   is_running: bool,
+  is_displaying_help: bool,
   cursor_x: usize,
   cursor_y: usize
 }
@@ -41,22 +57,22 @@ fn key_to_action(ch : i32) -> Action {
     'k' => Action::Cursor(Direction::Down),
     'h' => Action::Cursor(Direction::Left),
     'l' => Action::Cursor(Direction::Right),
+    's' => Action::SaveToFile,
+    'f' => Action::LoadFromFile,
+    '?' => Action::ToggleHelp,
     'q' => Action::Quit,
-    _ => Action::None
+    _ => match ch {
+      KEY_LEFT => Action::Cursor(Direction::Left),
+      KEY_RIGHT => Action::Cursor(Direction::Right),
+      KEY_UP => Action::Cursor(Direction::Down),
+      KEY_DOWN => Action::Cursor(Direction::Up),
+      KEY_F1 => Action::ToggleHelp,
+      _ => Action::None
+    }
   }
 }
 
-fn bind_to_range(val : i8, min : usize, max : usize) -> usize {
-  if val < min as i8 {
-    min
-  } else if val >= max as i8 {
-    max - 1 
-  } else {
-    val as usize
-  }
-}
-
-fn handle_action(a : Action, game_state : &mut GameState) {
+fn handle_action(a : Action, game_state : &mut GameState) -> Result<(), IoError> {
   match a {
     Action::SpeedUp => game_state.speed *= 2.0,
     Action::SpeedDown => game_state.speed /= 2.0,
@@ -68,8 +84,26 @@ fn handle_action(a : Action, game_state : &mut GameState) {
         Direction::Left => (0, -1),
         Direction::Right => (0, 1),
       };
-      game_state.cursor_x = bind_to_range(game_state.cursor_x as i8 + mod_x, 0, GAME_SIZE);
-      game_state.cursor_y = bind_to_range(game_state.cursor_y as i8 + mod_y, 0, GAME_SIZE);
+      game_state.cursor_x = add_mod_game_size(game_state.cursor_x, mod_x);
+      game_state.cursor_y = add_mod_game_size(game_state.cursor_y, mod_y);
+    },
+    Action::ToggleHelp => {
+      game_state.is_displaying_help = !game_state.is_displaying_help;
+      if game_state.is_displaying_help {
+        game_state.is_running = false
+      }
+    },
+    Action::SaveToFile => {
+      let mut f = try!(File::create(FILE_NAME));
+      try!(f.write_fmt(format_args!("{}", game_state.game)));
+      try!(f.sync_data());
+    },
+    Action::LoadFromFile => {
+      game_state.is_running = false;
+      let mut s = String::new();
+      let mut f = try!(File::open(FILE_NAME));
+      try!(f.read_to_string(&mut s));
+      game_state.game = Game::new(&s);
     },
     Action::ToggleFieldActive => {
       let (cur_x, cur_y) = (game_state.cursor_x, game_state.cursor_y);
@@ -80,38 +114,58 @@ fn handle_action(a : Action, game_state : &mut GameState) {
       );
     }
     _ => ()
-  }
+  };
+  Ok(())
+}
+
+fn get_help() -> String {
+  format!(r#"
+  Help!
+  F1, ?   - Show/Hide This Help
+  q       - Quit
+  x       - Toggle Cell
+  [space] - Start / Pause
+  <, >    - Adjust simulation speed
+  c       - Clear
+  s       - Dump state to file
+  f       - Load state from file
+  "#)
 }
 
 fn main() {
-  let game = Game::from_str([
-    "..X.",
-    "...X", 
-    ".XXX", 
-  ].iter()
-    .map(|x| x.to_string())
-    .collect()
-  );
+  let game = Game::new(&r#"
+    ..X.
+    ...X 
+    .XXX 
+  "#.to_string());
 
   let mut game_state = GameState {
     game: game,
     speed: 1.0,
     is_running: false,
+    is_displaying_help: true,
     cursor_x: 0,
     cursor_y: 0
   };
 
   initscr();
   noecho();
+  keypad(stdscr, true);
   timeout(0);
 
   loop {
     // print board
     clear();
     mv(0, 0);
-    printw(format!("{}", game_state.game).as_ref());
-    mv(game_state.cursor_x as i32, game_state.cursor_y as i32);
+
+    if !game_state.is_displaying_help {
+      printw(format!("{}", game_state.game).as_ref());
+      mv(game_state.cursor_x as i32, game_state.cursor_y as i32);
+    } else {
+      printw(get_help().as_ref());
+    }
     refresh();
+
 
     // handle actions
     let ch = getch();

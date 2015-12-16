@@ -17,13 +17,13 @@ pub enum Mutation {
 }
 
 impl Game {
-  pub fn from_str(rows : Vec<String>) -> Self {
+  pub fn new(rows : &String) -> Self {
     let mut game = Game {
       board: [[false; GAME_SIZE]; GAME_SIZE]
     };
 
     let cells_to_activate = rows
-      .iter()
+      .split("\n")
       .zip(0..GAME_SIZE)
       .map(|(row, x)| {
         row
@@ -41,7 +41,7 @@ impl Game {
     }
     
     game
-  } 
+  }
 
   fn count_neighbours(&self, x : usize, y : usize) -> usize {
     [
@@ -55,21 +55,14 @@ impl Game {
       (-1, 1),
     ].iter()
       .map(|&(mod_x, mod_y)| {
-        let n_x = x as i8 + mod_x;
-        let n_y = y as i8 + mod_y;
+
+        let n_x = add_mod_game_size(x, mod_x);
+        let n_y = add_mod_game_size(y, mod_y);
 
         (n_x, n_y)
       })
       .filter(|&(n_x, n_y)| {
-        let game_size_u = GAME_SIZE as i8;
-
-        let x_out_of_range = n_x < 0 || n_x >= game_size_u;
-        let y_out_of_range = n_y < 0 || n_y >= game_size_u;
-
-        !x_out_of_range && !y_out_of_range
-      })
-      .filter(|&(n_x, n_y)| {
-        let is_alive = self.board[n_x as usize][n_y as usize];
+        let is_alive = self.board[n_x][n_y];
         is_alive
       })
       .count()
@@ -110,6 +103,25 @@ impl Display for Game {
     }
 }
 
+
+pub fn add_mod_game_size(val : usize, modifier : i8) -> usize {
+  let new_val = val as i8 + modifier;
+  let game_size_i = GAME_SIZE as i8;
+
+  if new_val < 0 {
+    // TODO whatch out for modifier > val
+    (game_size_i + new_val) as usize
+  } else if new_val >= game_size_i {
+    (new_val - game_size_i) as usize
+  } else {
+    new_val as usize
+  }
+}
+
+#[test]
+fn test_add_mod_game_size() {
+  assert_eq!(add_mod_game_size(0, -1i8), (GAME_SIZE - 1) as usize);
+}
 
 pub fn game_of_life(game : &Game) -> Vec<Mutation> {
   (0..GAME_SIZE)
