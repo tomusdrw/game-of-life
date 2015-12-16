@@ -117,7 +117,12 @@ fn handle_action(a : Action, game_state : &mut GameState) -> Result<(), IoError>
     },
     Action::ToggleFieldActive => {
       let (cur_x, cur_y) = (game_state.cursor_x, game_state.cursor_y);
-      game_state.game.mutate(
+      let g = std::mem::replace(
+        &mut game_state.game,
+        Game::empty()
+      );
+      
+      game_state.game = g.mutate(
         vec![
           Mutation::Toggle(cur_x, cur_y) 
         ]
@@ -192,7 +197,7 @@ fn main() {
     if game_state.is_running {
       curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
       let mutations = game_of_life(&game_state.game);
-      game_state.game.mutate(mutations);
+      game_state.game = game_state.game.mutate(mutations);
 
       // slow it down
       let sleep_millis = (1.0 / game_state.speed * 500.0) as u64;

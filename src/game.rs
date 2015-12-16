@@ -10,6 +10,13 @@ pub struct Game {
   ]
 }
 
+///
+/// Example:
+///
+/// ```
+/// Mutation::On(1, 2)
+/// ```
+///
 pub enum Mutation {
   On(usize, usize),
   Off(usize, usize),
@@ -17,6 +24,9 @@ pub enum Mutation {
 }
 
 impl Game {
+  pub fn empty() -> Self {
+    Game { board: [[false; GAME_SIZE]; GAME_SIZE]}
+  }
   pub fn new(rows : &String) -> Self {
     let mut game = Game {
       board: [[false; GAME_SIZE]; GAME_SIZE]
@@ -35,7 +45,7 @@ impl Game {
           })
       })
       .flat_map(|x| x);
-
+    
     for (x, y) in cells_to_activate {
       game.board[x][y] = true;
     }
@@ -68,18 +78,20 @@ impl Game {
       .count()
   }
 
-  fn mutate_single(&mut self, mutation : Mutation) {
-    match mutation {
+  fn mutate_single(mut self, mutation : &Mutation) -> Game {
+    match *mutation {
       Mutation::On(x, y) => self.board[x][y] = true,
       Mutation::Off(x, y) => self.board[x][y] = false,
       Mutation::Toggle(x, y) => self.board[x][y] = !self.board[x][y]
     };
+    Game {
+      board: self.board
+    }
   }
 
-  pub fn mutate(&mut self, mutations : Vec<Mutation>) {
-    for mutation in mutations {
-      self.mutate_single(mutation)
-    }
+  pub fn mutate(self, mutations : Vec<Mutation>) -> Game{
+    mutations.iter()
+      .fold(self, |g, mutation| g.mutate_single(mutation))
   }
 
 }
