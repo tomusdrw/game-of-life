@@ -20,6 +20,7 @@ enum Direction {
 enum Action {
   SpeedUp,
   SpeedDown,
+  Clear,
   ToggleHelp,
   ToggleRunning,
   ToggleFieldActive,
@@ -30,11 +31,16 @@ enum Action {
   None
 }
 
-struct IoError;
+#[derive(Debug)]
+struct IoError {
+  description: &'static str
+}
 
 impl From<std::io::Error> for IoError {
-  fn from(err : std::io::Error) -> IoError {
-    IoError
+  fn from(_err : std::io::Error) -> IoError {
+    IoError {
+      description: "Error while handling IO"
+    }
   }
 }
 
@@ -57,6 +63,7 @@ fn key_to_action(ch : i32) -> Action {
     'k' => Action::Cursor(Direction::Down),
     'h' => Action::Cursor(Direction::Left),
     'l' => Action::Cursor(Direction::Right),
+    'c' => Action::Clear,
     's' => Action::SaveToFile,
     'f' => Action::LoadFromFile,
     '?' => Action::ToggleHelp,
@@ -93,6 +100,9 @@ fn handle_action(a : Action, game_state : &mut GameState) -> Result<(), IoError>
         game_state.is_running = false
       }
     },
+    Action::Clear => {
+      game_state.game = Game::new(&"".to_string());
+    }
     Action::SaveToFile => {
       let mut f = try!(File::create(FILE_NAME));
       try!(f.write_fmt(format_args!("{}", game_state.game)));
@@ -173,7 +183,10 @@ fn main() {
     if action == Action::Quit {
       break;
     }
-    handle_action(action, &mut game_state);
+
+    if action != Action::None {
+      handle_action(action, &mut game_state).expect("There was an error with saving/loading file");
+    }
 
     // run simulation step
     if game_state.is_running {
